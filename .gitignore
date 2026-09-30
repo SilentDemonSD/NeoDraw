@@ -6,3 +6,4 @@ samples/
 __pycache__/
 neodraw.toml
 *.part
+captures/
