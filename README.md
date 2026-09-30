@@ -51,6 +51,9 @@ The object detector runs on the **Neural Processing Unit (NPU)** built into Ryze
 - **Rotation-tolerant gestures.** Finger state is measured relative to the wrist, so gestures work at any hand angle.
 - **Fast restarts.** The compiled NPU model is cached on disk; only the first start pays the compile cost.
 - **One-step setup.** `setup.ps1` builds the environment, downloads the models and verifies the hardware.
+- **Undo.** The last 10 strokes, erases or clears can be undone.
+- **Snapshots and recording.** Save the drawing over the camera view as PNG, or record it as MP4. Files are written on background threads, so capture never slows the view.
+- **Detection toggle.** Turn object detection off to leave the NPU idle while you draw.
 - **Plain configuration.** One optional TOML file controls the camera, thresholds and NPU target.
 
 ## Performance
@@ -60,12 +63,13 @@ Measured on a Ryzen 7 7840HS (Phoenix NPU) with a 1280x720 camera:
 | Stage | Device | Result |
 | :--- | :--- | :--- |
 | YOLOv8m detection | NPU | about 60 ms per frame (12 to 14 detections per second) |
-| Hand tracking | CPU | about 17 ms per frame |
-| Display loop | CPU | about 25 frames per second |
+| Hand tracking | CPU | about 15 ms per frame |
+| Drawing overlay | CPU | under 0.1 ms per frame |
+| Display loop | CPU | about 29 frames per second, the camera's limit |
 | First start (model compile) | NPU toolchain | up to a minute, once |
 | Later starts (cached) | | a couple of seconds |
 
-All but 3 layers of the model run on the NPU with the default settings.
+All but 3 layers of the model run on the NPU with the default settings. The display loop is limited by the camera, which delivers at most 30 frames per second, not by processing.
 
 ## Gestures
 
@@ -81,7 +85,11 @@ Keyboard shortcuts:
 
 | Key | Action |
 | :--- | :--- |
+| <kbd>U</kbd> | Undo the last stroke, erase or clear |
 | <kbd>C</kbd> | Clear the drawing |
+| <kbd>S</kbd> | Save a snapshot to `captures/` |
+| <kbd>R</kbd> | Start or stop recording to `captures/` |
+| <kbd>D</kbd> | Turn object detection on or off |
 | <kbd>Z</kbd> | Reset zoom |
 | <kbd>Q</kbd> or <kbd>Esc</kbd> | Quit |
 
@@ -156,7 +164,9 @@ camera: HP True Vision FHD Camera (index 1)
 check ok: sample=['car', 'truck'], camera=(720, 1280, 3), YOLOv8m 59.2 ms/frame on VitisAIExecutionProvider, hands 19.2 ms/frame
 ```
 
-The bar at the top of the window shows the detection rate and latency, the display frame rate, the zoom level, the current mode, and the active colour and brush width.
+The bar at the top of the window shows the detection rate and latency, the display frame rate, the zoom level, the current mode, and the active colour and brush width. The bar at the bottom lists the keys and confirms actions such as a saved snapshot. A red REC marker shows while recording.
+
+Snapshots and recordings are saved to `captures/` with a timestamped name. They contain the camera view, boxes and drawing, without the status bars.
 
 ## Configuration
 
@@ -237,8 +247,9 @@ NeoDraw/
 │   ├── detector.py     YOLOv8m pre- and post-processing, background detection
 │   ├── gestures.py     Hand shape to gesture (pure logic, no dependencies)
 │   ├── hands.py        MediaPipe hand tracker
-│   ├── canvas.py       Drawing, erasing, colour and brush width
+│   ├── canvas.py       Drawing, erasing, colour, brush width and undo
 │   ├── zoom.py         Pinch zoom
+│   ├── captures.py     Snapshots and background video recording
 │   ├── camera.py       Camera selection by name
 │   ├── app.py          Main loop and overlay
 │   └── check.py        Hardware check
@@ -250,7 +261,7 @@ NeoDraw/
 └── neodraw.example.toml
 ```
 
-These folders are created locally and ignored by git: `.venv/`, `models/`, `samples/`, `cache/` and `sdk/`.
+These folders are created locally and ignored by git: `.venv/`, `models/`, `samples/`, `cache/`, `captures/` and `sdk/`.
 
 ## Extending NeoDraw
 
@@ -269,7 +280,7 @@ class MyDetector:
 
 ## Testing
 
-The interaction tests need no camera and no NPU. They run the gesture classifier, the canvas and the zoom on synthetic hands.
+The interaction tests need no camera and no NPU. They cover the gesture classifier, drawing, undo, overlay compositing, zoom, snapshots and video recording.
 
 ```powershell
 .venv\Scripts\python.exe -m tests.test_interaction
@@ -297,9 +308,22 @@ The hardware check covers the rest: NPU detection on a sample image, a camera fr
 ## FAQ
 
 <details>
-<summary><strong>Why not Mojo?</strong></summary>
+<summary><strong>Why not Mojo? Would it make NeoDraw faster?</strong></summary>
 
-Mojo has no native Windows build (WSL only), and Modular's MAX runtime targets CPUs and GPUs, not the AMD XDNA NPU. The only supported route to this NPU is AMD's Vitis AI execution provider, which is driven from Python or C++. The heavy work already runs in native code (the NPU, OpenCV and MediaPipe), so Python is not the bottleneck.
+No, for two reasons.
+
+1. **It cannot run here.** Mojo has no native Windows build (WSL only), and Modular's MAX runtime targets CPUs and GPUs, not the AMD XDNA NPU. The only supported route to this NPU is AMD's Vitis AI execution provider, driven from Python or C++.
+2. **Python is not the bottleneck.** A per-stage profile of the frame loop shows where the time goes:
+
+| Stage | Time per frame | Runs in |
+| :--- | :--- | :--- |
+| YOLOv8m detection | about 56 ms, off the main thread | NPU |
+| Hand tracking | about 15 ms | MediaPipe (C++) |
+| Camera read | about 4 ms | Media Foundation |
+| Drawing overlay | about 0.06 ms | OpenCV (C++) |
+| Everything else | under 1 ms | Python |
+
+The loop already reaches the camera's limit of about 30 frames per second. The one real hotspot the profile found, the drawing overlay at 17.8 ms, was fixed by switching from a NumPy boolean mask to `cv2.copyTo` with a maintained mask. Rewriting the remaining Python in Mojo would save less than a millisecond per frame.
 
 </details>
 
