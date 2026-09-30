@@ -2,7 +2,7 @@ import math
 
 FINGER_JOINTS = ((8, 6), (12, 10), (16, 14), (20, 18))
 PALM = (0, 5, 9, 13, 17)
-SHAPES = {(1, 1, 0, 0): "color", (1, 1, 1, 0): "width"}
+SHAPES = {(1, 1, 0, 0): "color", (1, 1, 1, 0): "width", (0, 0, 0, 0): "pan", (0, 0, 0, 1): "rotate"}
 
 
 def distance(a, b):
@@ -29,3 +29,7 @@ class Gestures:
     @staticmethod
     def pinch(points):
         return distance(points[4], points[8]) / max(distance(points[0], points[9]), 1.0)
+
+    @staticmethod
+    def palm_size(points):
+        return distance(points[0], points[9])
