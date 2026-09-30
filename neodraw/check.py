@@ -4,7 +4,6 @@ import cv2
 
 from .assets import Assets
 from .camera import Camera
-from .detector import Yolov8Detector
 from .hands import HandTracker
 from .runtime import NpuRuntime
 
@@ -22,7 +21,7 @@ class HardwareCheck:
         return (time.perf_counter() - started) * 1000 / runs
 
     def run(self):
-        yolo = Yolov8Detector(NpuRuntime(self.settings), self.settings)
+        yolo = Assets.detector(self.settings.detector)(NpuRuntime(self.settings), self.settings)
         labels = {label for _, _, label in yolo.detect(cv2.imread(str(self.settings.sample)))}
         assert {"car", "truck"} <= labels, labels
         camera = Camera(self.settings)

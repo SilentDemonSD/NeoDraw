@@ -13,11 +13,13 @@ class Settings:
     camera: str = ""
     width: int = 1280
     height: int = 720
+    detector: str = "yolox-s"
     npu_target: str = "RyzenAI_vision_config_2"
     npu_overlay: str = "phoenix/4x4.xclbin"
     score: float = 0.45
     iou: float = 0.5
-    max_zoom: float = 4.0
+    max_zoom: float = 8.0
+    depth_gain: float = 1.5
     eraser_radius: int = 60
     hold_frames: int = 3
 
@@ -38,10 +40,6 @@ class Settings:
     @property
     def cache(self):
         return self.root / "cache"
-
-    @property
-    def yolo_dir(self):
-        return self.root / "models" / "yolov8m"
 
     @property
     def hand_model(self):

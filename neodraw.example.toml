@@ -1,10 +1,12 @@
 camera = "HP True Vision"
 width = 1280
 height = 720
+detector = "yolox-s"
 npu_target = "RyzenAI_vision_config_2"
 npu_overlay = "phoenix/4x4.xclbin"
 score = 0.45
 iou = 0.5
-max_zoom = 4.0
+max_zoom = 8.0
+depth_gain = 1.5
 eraser_radius = 60
 hold_frames = 3
