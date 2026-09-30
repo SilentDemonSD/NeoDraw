@@ -1,0 +1,8 @@
+.venv/
+sdk/
+cache/
+models/
+samples/
+__pycache__/
+neodraw.toml
+*.part

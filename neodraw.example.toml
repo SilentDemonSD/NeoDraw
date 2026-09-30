@@ -1,0 +1,10 @@
+camera = "HP True Vision"
+width = 1280
+height = 720
+npu_target = "RyzenAI_vision_config_2"
+npu_overlay = "phoenix/4x4.xclbin"
+score = 0.45
+iou = 0.5
+max_zoom = 4.0
+eraser_radius = 60
+hold_frames = 3

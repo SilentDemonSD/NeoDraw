@@ -1,0 +1,9 @@
+numpy==1.26.4
+opencv-python==4.11.0.86
+cv2-enumerate-cameras==1.4.0
+absl-py
+flatbuffers
+protobuf
+sounddevice
+matplotlib
+certifi
