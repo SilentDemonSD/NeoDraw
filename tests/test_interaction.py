@@ -1,6 +1,10 @@
+import tempfile
+from pathlib import Path
+
 import numpy as np
 
 from neodraw.canvas import AirCanvas
+from neodraw.captures import Captures
 from neodraw.gestures import FINGER_JOINTS, Gestures
 from neodraw.zoom import DigitalZoom
 
@@ -43,6 +47,40 @@ def test_canvas():
     assert not canvas.ink.any()
 
 
+def test_undo_and_render():
+    canvas = AirCanvas((200, 200, 3), hold_frames=1)
+    pointing = shifted(fake_hand(0, (1, 0, 0, 0)))
+    canvas.update("draw", pointing)
+    canvas.update("idle", pointing)
+    first = canvas.ink.copy()
+    canvas.update("draw", [(x + 30, y) for x, y in pointing])
+    canvas.update("idle", pointing)
+    assert canvas.undo() and np.array_equal(canvas.ink, first)
+    canvas.clear()
+    assert not canvas.mask.any()
+    assert canvas.undo() and np.array_equal(canvas.ink, first)
+    frame = np.full((200, 200, 3), 50, np.uint8)
+    canvas.render(frame)
+    painted = canvas.mask > 0
+    assert (frame[painted] == canvas.ink[painted]).all() and (frame[~painted] == 50).all()
+    assert canvas.undo() and not canvas.ink.any() and not canvas.undo()
+
+
+def test_captures():
+    with tempfile.TemporaryDirectory() as directory:
+        captures = Captures(Path(directory))
+        frame = np.full((72, 128, 3), 90, np.uint8)
+        image = captures.snapshot(frame)
+        captures.toggle_recording(frame, 30)
+        for _ in range(10):
+            captures.write(frame)
+        message = captures.toggle_recording(frame, 30)
+        captures.close()
+        videos = list(Path(directory).glob("*.mp4"))
+        assert image.exists() and message.startswith("saved"), message
+        assert len(videos) == 1 and videos[0].stat().st_size > 0
+
+
 def test_zoom():
     zoom = DigitalZoom(smoothing=1.0)
     zoom.update(True, fake_hand(1, (1, 0, 0, 0), pinch=1.0))
@@ -58,5 +96,7 @@ def test_zoom():
 if __name__ == "__main__":
     test_gestures()
     test_canvas()
+    test_undo_and_render()
+    test_captures()
     test_zoom()
     print("interaction tests ok")
